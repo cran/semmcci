@@ -19,12 +19,24 @@
 #' @param alpha Numeric vector.
 #'   Significance level.
 #'   Default value is `alpha = c(0.001, 0.01, 0.05)`.
+#' @param decomposition Character string.
+#'   Matrix decomposition of the sampling variance-covariance matrix for the data generation.
+#'   If `decomposition = "chol"`, use Cholesky decomposition.
+#'   If `decomposition = "eigen"`, use eigenvalue decomposition.
+#'   If `decomposition = "svd"`, use singular value decomposition.
+#'   If `decomposition = NULL`, try Cholesky decomposition.
+#'   If Cholesky decomposition fails, try eigenvalue decomposition.
+#'   Finally, if eigenvalue decomposition fails, try singular value decomposition.
+#' @param pd Logical.
+#'   If `pd = TRUE`, check if the sampling variance-covariance matrix is positive definite using `tol` if `decomposition %in% c("eigen", "svd")`.
+#' @param tol Numeric.
+#'   Tolerance used for `pd`..
 #' @return Returns an object of class `semmcci` which is a list with the following elements:
 #' \describe{
 #'   \item{`R`}{Number of Monte Carlo replications.}
 #'   \item{`alpha`}{Significance level specified.}
 #'   \item{`lavaan`}{`lavaan` object.}
-#'   \item{`mvn`}{Method used to generate multivariate normal random variates.}
+#'   \item{`decomposition`}{Matrix decomposition used to generate multivariate normal random variates.}
 #'   \item{`thetahat`}{Parameter estimates.}
 #'   \item{`thetahatstar`}{Sampling distribution of parameter estimates.}
 #' }
@@ -34,18 +46,27 @@
 #'
 #' # Generate Data ------------------------------------------------------------
 #' n <- 1000
-#' x <- rnorm(n = n)
-#' m <- 0.50 * x + rnorm(n = n)
-#' y <- 0.25 * x + 0.50 * m + rnorm(n = n)
-#' data <- data.frame(x, m, y)
+#' a <- 0.50
+#' b <- 0.50
+#' cp <- 0.25
+#' s2_em <- 1 - a^2
+#' s2_ey <- 1 - cp^2 - a^2 * b^2 - b^2 * s2_em - 2 * cp * a * b
+#' em <- rnorm(n = n, mean = 0, sd = sqrt(s2_em))
+#' ey <- rnorm(n = n, mean = 0, sd = sqrt(s2_ey))
+#' X <- rnorm(n = n)
+#' M <- a * X + em
+#' Y <- cp * X + b * M + ey
+#' df <- data.frame(X, M, Y)
 #'
 #' # Fit Model in lavaan ------------------------------------------------------
 #' model <- "
-#'   y ~ cp * x + b * m
-#'   m ~ a * x
-#'   ab := a * b
+#'   Y ~ cp * X + b * M
+#'   M ~ a * X
+#'   indirect := a * b
+#'   direct := cp
+#'   total := cp + (a * b)
 #' "
-#' fit <- sem(data = data, model = model)
+#' fit <- sem(data = df, model = model)
 #'
 #' # Monte Carlo --------------------------------------------------------------
 #' MC(
@@ -53,74 +74,36 @@
 #'   R = 100L, # use a large value e.g., 20000L for actual research
 #'   alpha = c(0.001, 0.01, 0.05)
 #' )
-#' @importFrom methods is
-#' @importFrom stats var complete.cases
 #' @keywords mc
 #' @export
 MC <- function(object,
                R = 20000L,
-               alpha = c(0.001, 0.01, 0.05)) {
+               alpha = c(0.001, 0.01, 0.05),
+               decomposition = "chol",
+               pd = TRUE,
+               tol = 1e-06) {
   stopifnot(
     methods::is(
       object,
       "lavaan"
     )
   )
-  # set up Monte Carlo
-  location <- lavaan::coef(object)
-  scale <- lavaan::vcov(object)
-  k <- length(location)
-  n <- R
-  norm <- matrix(
-    data = stats::rnorm(
-      n = n * k
-    ),
-    nrow = n,
-    ncol = k
-  )
-  tryCatch(
-    {
-      thetahatstar_orig <- .MVNChol(
-        norm = norm,
-        mat = chol(scale)
-      )
-      mvn <- "chol"
-    },
-    warning = function(w) {
-      mvn <- "eigen"
-    },
-    error = function(e) {
-      mvn <- "eigen"
+  if (!is.null(decomposition)) {
+    if (decomposition == "chol") {
+      pd <- FALSE
     }
-  )
-  if (mvn == "eigen") {
-    eig <- eigen(
-      scale,
-      symmetric = TRUE,
-      only.values = FALSE
-    )
-    if (
-      !all(
-        eig$values >= 1e-06 * abs(eig$values[1])
-      )
-    ) {
-      stop(
-        "The sampling variance-covariance matrix is nonpositive definite."
-      )
-    }
-    thetahatstar_orig <- .MVNEigen(
-      norm = norm,
-      mat = eig
-    )
   }
-  thetahatstar_orig <- thetahatstar_orig + rep(
-    x = location,
-    times = rep(
-      x = n,
-      times = k
-    )
+  # set up Monte Carlo
+  thetahatstar <- .ThetaStar(
+    R = R,
+    scale = lavaan::vcov(object),
+    location = lavaan::coef(object),
+    decomposition = decomposition,
+    pd = pd,
+    tol = tol
   )
-  colnames(thetahatstar_orig) <- names(location)
+  thetahatstar_orig <- thetahatstar$thetahatstar
+  decomposition <- thetahatstar$decomposition
   # extract all estimates including fixed parameters
   thetahat <- .ThetaHat(
     object = object
@@ -132,7 +115,9 @@ MC <- function(object,
         {
           return(
             object@Model@def.function(
-              thetahatstar_orig[i, ]
+              thetahatstar_orig[
+                i,
+              ]
             )
           )
         },
@@ -145,7 +130,11 @@ MC <- function(object,
       )
     }
     thetahatstar_def <- lapply(
-      X = seq_len(dim(thetahatstar_orig)[1]),
+      X = seq_len(
+        dim(
+          thetahatstar_orig
+        )[1]
+      ),
       FUN = def
     )
     thetahatstar_def <- do.call(
@@ -163,13 +152,22 @@ MC <- function(object,
   if (length(thetahat$ceq) > 0) {
     ceq <- function(i) {
       out <- object@Model@ceq.function(
-        thetahatstar[i, ]
+        thetahatstar[
+          i,
+        ]
       )
-      names(out) <- paste0(thetahat$ceq, "_ceq")
+      names(out) <- paste0(
+        thetahat$ceq,
+        "_ceq"
+      )
       return(out)
     }
     thetahatstar_ceq <- lapply(
-      X = seq_len(dim(thetahatstar)[1]),
+      X = seq_len(
+        dim(
+          thetahatstar
+        )[1]
+      ),
       FUN = ceq
     )
     thetahatstar_ceq <- do.call(
@@ -185,13 +183,22 @@ MC <- function(object,
   if (length(thetahat$cin) > 0) {
     cin <- function(i) {
       out <- object@Model@cin.function(
-        thetahatstar[i, ]
+        thetahatstar[
+          i,
+        ]
       )
-      names(out) <- paste0(thetahat$cin, "_cin")
+      names(out) <- paste0(
+        thetahat$cin,
+        "_cin"
+      )
       return(out)
     }
     thetahatstar_cin <- lapply(
-      X = seq_len(dim(thetahatstar)[1]),
+      X = seq_len(
+        dim(
+          thetahatstar
+        )[1]
+      ),
       FUN = cin
     )
     thetahatstar_cin <- do.call(
@@ -207,12 +214,23 @@ MC <- function(object,
   if (length(thetahat$fixed) > 0) {
     fixed <- matrix(
       NA,
-      ncol = length(thetahat$fixed),
-      nrow = dim(thetahatstar)[1]
+      ncol = length(
+        thetahat$fixed
+      ),
+      nrow = dim(
+        thetahatstar
+      )[1]
     )
-    colnames(fixed) <- thetahat$fixed
+    colnames(
+      fixed
+    ) <- thetahat$fixed
     for (i in seq_len(dim(fixed)[2])) {
-      fixed[, i] <- thetahat$est[thetahat$fixed[[i]]]
+      fixed[
+        ,
+        i
+      ] <- thetahat$est[
+        thetahat$fixed[[i]]
+      ]
     }
     thetahatstar <- cbind(
       thetahatstar,
@@ -220,37 +238,18 @@ MC <- function(object,
     )
   }
   # rearrange
-  thetahatstar <- thetahatstar[, thetahat$par_names]
-  # remove rows with NAs
-  # thetahatstar <- thetahatstar[stats::complete.cases(thetahatstar), ]
-  # inferences
-  #   se <- sqrt(diag(stats::var(thetahatstar)))
-  #   ci <- vector(
-  #     mode = "list",
-  #     length = dim(thetahatstar)[2]
-  #   )
-  #   for (i in seq_len(dim(thetahatstar)[2])) {
-  #     ci[[i]] <- .PCCI(
-  #       thetahatstar = thetahatstar[, i],
-  #       thetahat = thetahat$est[[i]],
-  #       alpha = alpha
-  #     )
-  #   }
-  #   ci <- do.call(
-  #     what = "rbind",
-  #     args = ci
-  #   )
-  #   rownames(ci) <- colnames(thetahatstar)
-  #   ci <- ci[which(!rownames(ci) %in% thetahat$fixed), ]
+  thetahatstar <- thetahatstar[
+    ,
+    thetahat$par_names
+  ]
   # output
   out <- list(
     R = R,
     alpha = alpha,
     lavaan = object,
-    mvn = mvn,
+    decomposition = decomposition,
     thetahat = thetahat,
     thetahatstar = thetahatstar
-    # ci = ci
   )
   class(out) <- c(
     "semmcci",

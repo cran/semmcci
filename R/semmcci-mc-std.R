@@ -20,7 +20,7 @@
 #'   \item{`R`}{Number of Monte Carlo replications.}
 #'   \item{`alpha`}{Significance level specified.}
 #'   \item{`lavaan`}{`lavaan` object.}
-#'   \item{`mvn`}{Method used to generate multivariate normal random variates.}
+#'   \item{`decomposition`}{Matrix decomposition used to generate multivariate normal random variates.}
 #'   \item{`thetahat`}{Parameter estimates.}
 #'   \item{`thetahatstar`}{Sampling distribution of parameter estimates.}
 #'   \item{`ci`}{Confidence intervals.}
@@ -33,18 +33,27 @@
 #'
 #' # Generate Data ------------------------------------------------------------
 #' n <- 1000
-#' x <- rnorm(n = n)
-#' m <- 0.50 * x + rnorm(n = n)
-#' y <- 0.25 * x + 0.50 * m + rnorm(n = n)
-#' data <- data.frame(x, m, y)
+#' a <- 0.50
+#' b <- 0.50
+#' cp <- 0.25
+#' s2_em <- 1 - a^2
+#' s2_ey <- 1 - cp^2 - a^2 * b^2 - b^2 * s2_em - 2 * cp * a * b
+#' em <- rnorm(n = n, mean = 0, sd = sqrt(s2_em))
+#' ey <- rnorm(n = n, mean = 0, sd = sqrt(s2_ey))
+#' X <- rnorm(n = n)
+#' M <- a * X + em
+#' Y <- cp * X + b * M + ey
+#' df <- data.frame(X, M, Y)
 #'
 #' # Fit Model in lavaan ------------------------------------------------------
 #' model <- "
-#'   y ~ cp * x + b * m
-#'   m ~ a * x
-#'   ab := a * b
+#'   Y ~ cp * X + b * M
+#'   M ~ a * X
+#'   indirect := a * b
+#'   direct := cp
+#'   total := cp + (a * b)
 #' "
-#' fit <- sem(data = data, model = model, fixed.x = FALSE)
+#' fit <- sem(data = df, model = model, fixed.x = FALSE)
 #'
 #' # Monte Carlo --------------------------------------------------------------
 #' output <- MC(
@@ -55,7 +64,6 @@
 #'
 #' # Standardized Monte Carlo -------------------------------------------------
 #' MCStd(output)
-#' @importFrom lavaan standardizedSolution
 #' @keywords mc
 #' @export
 MCStd <- function(object,
@@ -77,16 +85,27 @@ MCStd <- function(object,
       remove.eq = FALSE,
       remove.ineq = FALSE,
       remove.def = FALSE
-    )[, "est.std"]
+    )[
+      ,
+      "est.std"
+    ]
   )
-  names(thetahat_std) <- colnames(object$thetahatstar)
+  names(
+    thetahat_std
+  ) <- colnames(
+    object$thetahatstar
+  )
   i_free <- object$lavaan@ParTable$free > 0
-  foo <- function(i, p) {
+  foo <- function(i,
+                  p) {
     tryCatch(
       {
         return(
           .StdLav(
-            est = object$thetahatstar[i, i_free],
+            est = object$thetahatstar[
+              i,
+              i_free
+            ],
             object = object$lavaan
           )
         )
@@ -110,47 +129,34 @@ MCStd <- function(object,
     )
   }
   thetahatstar_std <- lapply(
-    X = seq_len(dim(object$thetahatstar)[1]),
+    X = seq_len(
+      dim(
+        object$thetahatstar
+      )[1]
+    ),
     FUN = foo,
-    p = length(thetahat_std)
+    p = length(
+      thetahat_std
+    )
   )
   thetahatstar_std <- do.call(
     what = "rbind",
     args = thetahatstar_std
   )
-  colnames(thetahatstar_std) <- colnames(object$thetahatstar)
-  # remove rows with NAs
-  # thetahatstar_std <- thetahatstar_std[stats::complete.cases(thetahatstar_std), ]
-  #   se <- sqrt(diag(stats::var(thetahatstar_std)))
-  #   ci_std <- vector(
-  #     mode = "list",
-  #     length = dim(thetahatstar_std)[2]
-  #   )
-  #   for (i in seq_len(dim(thetahatstar_std)[2])) {
-  #     ci_std[[i]] <- .PCCI(
-  #       thetahatstar = thetahatstar_std[, i],
-  #       thetahat = thetahat_std[[i]],
-  #       alpha = alpha
-  #     )
-  #   }
-  #   ci_std <- do.call(
-  #     what = "rbind",
-  #     args = ci_std
-  #   )
-  #   rownames(ci_std) <- colnames(thetahatstar_std)
-  #   ci_std <- ci_std[which(object$lavaan@ParTable$op != "~1"), ]
-  #   ci_std <- ci_std[which(!rownames(ci_std) %in% object$thetahat$fixed), ]
+  colnames(
+    thetahatstar_std
+  ) <- colnames(
+    object$thetahatstar
+  )
   out <- list(
     R = object$R,
     alpha = object$alpha,
     lavaan = object$lavaan,
-    mvn = object$mvn,
+    decomposition = object$decomposition,
     thetahat = object$thetahat,
     thetahatstar = object$thetahatstar,
-    ci = object$ci,
     thetahat_std = thetahat_std,
     thetahatstar_std = thetahatstar_std
-    # ci_std = ci_std
   )
   class(out) <- c(
     "semmccistd",

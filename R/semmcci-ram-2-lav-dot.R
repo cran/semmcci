@@ -10,7 +10,6 @@
 #' @param standardized If `TRUE`, the `psi` and `beta` matrices
 #'  contain the correlations. Default is `FALSE`.
 #' @return A list of `lavaan` model matrices for one group.
-#' @importFrom stats cov2cor
 #' @keywords matrix internal
 #' @noRd
 .RAM2Lav <- function(ram,
@@ -20,14 +19,14 @@
   lv_names <- rownames(lav_mod$psi)
   lv_names <- lv_names[!(lv_names %in% ov_names)]
 
-  mA <- ram$A
+  a_mat <- ram$A
 
   if (!is.null(lav_mod$lambda)) {
     # A to lambda
     lav_mod$lambda[] <- 0
     lambda_rnames <- rownames(lav_mod$lambda)
     lambda_cnames <- colnames(lav_mod$lambda)
-    lav_mod$lambda <- mA[
+    lav_mod$lambda <- a_mat[
       lambda_rnames,
       lambda_cnames
     ]
@@ -40,16 +39,16 @@
     # A to beta
     lav_mod$beta[] <- 0
     beta_names <- rownames(lav_mod$beta)
-    lav_mod$beta <- mA[beta_names, beta_names]
+    lav_mod$beta <- a_mat[beta_names, beta_names]
   }
 
-  mS <- ram$S
+  s_mat <- ram$S
 
   if (!is.null(lav_mod$theta)) {
     # S to theta
     lav_mod$theta[] <- 0
     theta_names <- rownames(lav_mod$theta)
-    lav_mod$theta <- mS[theta_names, theta_names]
+    lav_mod$theta <- s_mat[theta_names, theta_names]
     if (standardized) {
       tmp <- diag(lav_mod$theta)
       lav_mod$theta <- stats::cov2cor(lav_mod$theta)
@@ -61,7 +60,7 @@
     # S to psi
     lav_mod$psi[] <- 0
     psi_names <- rownames(lav_mod$psi)
-    lav_mod$psi <- mS[psi_names, psi_names]
+    lav_mod$psi <- s_mat[psi_names, psi_names]
     if (standardized) {
       tmp <- diag(lav_mod$psi)
       lav_mod$psi <- stats::cov2cor(lav_mod$psi)

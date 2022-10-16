@@ -4,7 +4,14 @@
 \alias{MC}
 \title{Monte Carlo Confidence Intervals}
 \usage{
-MC(object, R = 20000L, alpha = c(0.001, 0.01, 0.05))
+MC(
+  object,
+  R = 20000L,
+  alpha = c(0.001, 0.01, 0.05),
+  decomposition = "chol",
+  pd = TRUE,
+  tol = 1e-06
+)
 }
 \arguments{
 \item{object}{object of class \code{lavaan}.}
@@ -15,6 +22,21 @@ Number of Monte Carlo replications.}
 \item{alpha}{Numeric vector.
 Significance level.
 Default value is \code{alpha = c(0.001, 0.01, 0.05)}.}
+
+\item{decomposition}{Character string.
+Matrix decomposition of the sampling variance-covariance matrix for the data generation.
+If \code{decomposition = "chol"}, use Cholesky decomposition.
+If \code{decomposition = "eigen"}, use eigenvalue decomposition.
+If \code{decomposition = "svd"}, use singular value decomposition.
+If \code{decomposition = NULL}, try Cholesky decomposition.
+If Cholesky decomposition fails, try eigenvalue decomposition.
+Finally, if eigenvalue decomposition fails, try singular value decomposition.}
+
+\item{pd}{Logical.
+If \code{pd = TRUE}, check if the sampling variance-covariance matrix is positive definite using \code{tol} if \code{decomposition \%in\% c("eigen", "svd")}.}
+
+\item{tol}{Numeric.
+Tolerance used for \code{pd}..}
 }
 \value{
 Returns an object of class \code{semmcci} which is a list with the following elements:
@@ -22,7 +44,7 @@ Returns an object of class \code{semmcci} which is a list with the following ele
 \item{\code{R}}{Number of Monte Carlo replications.}
 \item{\code{alpha}}{Significance level specified.}
 \item{\code{lavaan}}{\code{lavaan} object.}
-\item{\code{mvn}}{Method used to generate multivariate normal random variates.}
+\item{\code{decomposition}}{Matrix decomposition used to generate multivariate normal random variates.}
 \item{\code{thetahat}}{Parameter estimates.}
 \item{\code{thetahatstar}}{Sampling distribution of parameter estimates.}
 }
@@ -46,18 +68,27 @@ library(lavaan)
 
 # Generate Data ------------------------------------------------------------
 n <- 1000
-x <- rnorm(n = n)
-m <- 0.50 * x + rnorm(n = n)
-y <- 0.25 * x + 0.50 * m + rnorm(n = n)
-data <- data.frame(x, m, y)
+a <- 0.50
+b <- 0.50
+cp <- 0.25
+s2_em <- 1 - a^2
+s2_ey <- 1 - cp^2 - a^2 * b^2 - b^2 * s2_em - 2 * cp * a * b
+em <- rnorm(n = n, mean = 0, sd = sqrt(s2_em))
+ey <- rnorm(n = n, mean = 0, sd = sqrt(s2_ey))
+X <- rnorm(n = n)
+M <- a * X + em
+Y <- cp * X + b * M + ey
+df <- data.frame(X, M, Y)
 
 # Fit Model in lavaan ------------------------------------------------------
 model <- "
-  y ~ cp * x + b * m
-  m ~ a * x
-  ab := a * b
+  Y ~ cp * X + b * M
+  M ~ a * X
+  indirect := a * b
+  direct := cp
+  total := cp + (a * b)
 "
-fit <- sem(data = data, model = model)
+fit <- sem(data = df, model = model)
 
 # Monte Carlo --------------------------------------------------------------
 MC(
