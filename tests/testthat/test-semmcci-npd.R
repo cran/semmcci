@@ -22,15 +22,6 @@ lapply(
             scale = scale,
             location = location,
             decomposition = "chol",
-            pd = FALSE
-          )
-        )
-        testthat::expect_error(
-          semmcci:::.ThetaStar(
-            R = 2000L,
-            scale = scale,
-            location = location,
-            decomposition = "chol",
             pd = TRUE
           )
         )
@@ -39,15 +30,6 @@ lapply(
     testthat::test_that(
       paste(text, "eigen"),
       {
-        testthat::expect_error(
-          semmcci:::.ThetaStar(
-            R = 2000L,
-            scale = scale,
-            location = location,
-            decomposition = "eigen",
-            pd = FALSE
-          )
-        )
         testthat::expect_error(
           semmcci:::.ThetaStar(
             R = 2000L,
@@ -92,7 +74,8 @@ lapply(
       R = 2000L,
       scale = scale,
       location = location,
-      decomposition = NULL
+      decomposition = "eigen",
+      pd = FALSE
     )
   },
   text = "test-semmcci-npd"

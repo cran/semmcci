@@ -8,7 +8,7 @@ MC(
   object,
   R = 20000L,
   alpha = c(0.001, 0.01, 0.05),
-  decomposition = "chol",
+  decomposition = "eigen",
   pd = TRUE,
   tol = 1e-06
 )
@@ -20,38 +20,42 @@ MC(
 Number of Monte Carlo replications.}
 
 \item{alpha}{Numeric vector.
-Significance level.
+Significance level \eqn{\alpha}.
 Default value is \code{alpha = c(0.001, 0.01, 0.05)}.}
 
 \item{decomposition}{Character string.
-Matrix decomposition of the sampling variance-covariance matrix for the data generation.
+Matrix decomposition of the sampling variance-covariance matrix
+for the data generation.
 If \code{decomposition = "chol"}, use Cholesky decomposition.
 If \code{decomposition = "eigen"}, use eigenvalue decomposition.
-If \code{decomposition = "svd"}, use singular value decomposition.
-If \code{decomposition = NULL}, try Cholesky decomposition.
-If Cholesky decomposition fails, try eigenvalue decomposition.
-Finally, if eigenvalue decomposition fails, try singular value decomposition.}
+If \code{decomposition = "svd"}, use singular value decomposition.}
 
 \item{pd}{Logical.
-If \code{pd = TRUE}, check if the sampling variance-covariance matrix is positive definite using \code{tol} if \code{decomposition \%in\% c("eigen", "svd")}.}
+If \code{pd = TRUE},
+check if the sampling variance-covariance matrix
+is positive definite using \code{tol}.}
 
 \item{tol}{Numeric.
-Tolerance used for \code{pd}..}
+Tolerance used for \code{pd}.}
 }
 \value{
-Returns an object of class \code{semmcci} which is a list with the following elements:
+Returns an object of class \code{semmcci}
+which is a list with the following elements:
 \describe{
 \item{\code{R}}{Number of Monte Carlo replications.}
-\item{\code{alpha}}{Significance level specified.}
+\item{\code{alpha}}{Significance level \eqn{\alpha} specified.}
 \item{\code{lavaan}}{\code{lavaan} object.}
-\item{\code{decomposition}}{Matrix decomposition used to generate multivariate normal random variates.}
-\item{\code{thetahat}}{Parameter estimates.}
-\item{\code{thetahatstar}}{Sampling distribution of parameter estimates.}
+\item{\code{decomposition}}{Matrix decomposition
+used to generate multivariate
+normal random variates.}
+\item{\code{thetahat}}{Parameter estimates \eqn{\hat{\theta}}.}
+\item{\code{thetahatstar}}{Sampling distribution of parameter estimates
+\eqn{\hat{\theta}^{\ast}}.}
 }
 }
 \description{
 Calculates Monte Carlo confidence intervals
-for free and defined parameters
+for free and defined parameters.
 }
 \details{
 A sampling distribution of parameter estimates is generated
