@@ -10,7 +10,9 @@
 #' @param standardized If `TRUE`, the `psi` and `beta` matrices
 #'  contain the correlations. Default is `FALSE`.
 #' @return A list of `lavaan` model matrices for one group.
-#' @keywords matrix internal
+#'
+#' @family Lavaan Helper Functions
+#' @keywords lavHelper matrix internal
 #' @noRd
 .RAM2Lav <- function(ram,
                      lav_mod,
@@ -83,5 +85,5 @@
     lav_mod$alpha[] <- t(ram$M[, alpha_names, drop = FALSE])
   }
 
-  lav_mod
+  return(lav_mod)
 }

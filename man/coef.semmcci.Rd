@@ -21,37 +21,57 @@ Parameter Estimates
 library(semmcci)
 library(lavaan)
 
-# Generate Data ------------------------------------------------------------
-n <- 1000
-a <- 0.50
-b <- 0.50
-cp <- 0.25
-s2_em <- 1 - a^2
-s2_ey <- 1 - cp^2 - a^2 * b^2 - b^2 * s2_em - 2 * cp * a * b
-em <- rnorm(n = n, mean = 0, sd = sqrt(s2_em))
-ey <- rnorm(n = n, mean = 0, sd = sqrt(s2_ey))
-X <- rnorm(n = n)
-M <- a * X + em
-Y <- cp * X + b * M + ey
-df <- data.frame(X, M, Y)
+# Data ---------------------------------------------------------------------
+data("Tal.Or", package = "psych")
+df <- mice::ampute(Tal.Or)$amp
 
-# Fit Model in lavaan ------------------------------------------------------
+# Monte Carlo --------------------------------------------------------------
+## Fit Model in lavaan -----------------------------------------------------
 model <- "
-  Y ~ cp * X + b * M
-  M ~ a * X
+  reaction ~ cp * cond + b * pmi
+  pmi ~ a * cond
+  cond ~~ cond
   indirect := a * b
   direct := cp
   total := cp + (a * b)
 "
-fit <- sem(data = df, model = model)
+fit <- sem(data = df, model = model, missing = "fiml")
 
-# Monte Carlo --------------------------------------------------------------
+## MC() --------------------------------------------------------------------
 unstd <- MC(
   fit,
-  R = 100L, # use a large value e.g., 20000L for actual research
-  alpha = c(0.001, 0.01, 0.05)
+  R = 20L # use a large value e.g., 20000L for actual research
 )
+
+## Standardized Monte Carlo ------------------------------------------------
+std <- MCStd(unstd)
 coef(unstd)
+coef(std)
+
+# Monte Carlo (Multiple Imputation) ----------------------------------------
+## Multiple Imputation -----------------------------------------------------
+mi <- mice::mice(
+  data = df,
+  print = FALSE,
+  m = 5L, # use a large value e.g., 100L for actual research,
+  seed = 42
+)
+
+## Fit Model in lavaan -----------------------------------------------------
+fit <- sem(data = df, model = model) # use default listwise deletion
+
+## MCMI() ------------------------------------------------------------------
+unstd <- MCMI(
+  fit,
+  mi = mi,
+  R = 20L # use a large value e.g., 20000L for actual research
+)
+
+## Standardized Monte Carlo ------------------------------------------------
+std <- MCStd(unstd)
+coef(unstd)
+coef(std)
+
 }
 \author{
 Ivan Jacob Agaloos Pesigan

@@ -10,7 +10,9 @@
 #' @param object object of class `lavaan`.
 #' @return A vector of the standardized solution, of the same
 #'  length as the number of rows in the parameter table.
-#' @keywords matrix standardized internal
+#'
+#' @family Lavaan Helper Functions
+#' @keywords lavHelper matrix standardized internal
 #' @noRd
 .StdLav <- function(est,
                     object) {
@@ -83,9 +85,11 @@
 
   # Get parameter values with type = "user" and extra = TRUE
 
-  lavaan::lav_model_get_parameters(
-    lavmodel = lav_model_new,
-    type = "user",
-    extra = TRUE
+  return(
+    lavaan::lav_model_get_parameters(
+      lavmodel = lav_model_new,
+      type = "user",
+      extra = TRUE
+    )
   )
 }

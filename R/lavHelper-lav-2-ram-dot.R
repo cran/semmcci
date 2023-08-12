@@ -5,7 +5,9 @@
 #' @author Shu Fai Cheung
 #' @param lav_mod A list of lavaan model matrices for one group.
 #' @return A list of A, S, F, and M RAM matrices.
-#' @keywords matrix internal
+#'
+#' @family Lavaan Helper Functions
+#' @keywords lavHelper matrix internal
 #' @noRd
 .Lav2RAM <- function(lav_mod) {
   ov_names <- rownames(lav_mod$theta)
@@ -79,10 +81,12 @@
     m_mat[, rownames(lav_mod$alpha)] <- NA
   }
 
-  list(
-    A = a_mat,
-    S = s_mat,
-    F = f_mat,
-    M = m_mat
+  return(
+    list(
+      A = a_mat,
+      S = s_mat,
+      F = f_mat,
+      M = m_mat
+    )
   )
 }

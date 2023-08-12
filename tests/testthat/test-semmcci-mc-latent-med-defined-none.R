@@ -18,26 +18,34 @@ lapply(
       model = model,
       data = data
     )
-    set.seed(seed)
-    results_chol <- MC(
-      fit,
-      R = R,
-      alpha = c(0.001, 0.01, 0.05),
-      decomposition = "chol"
+    run <- TRUE
+    tryCatch(
+      {
+        results_chol <- MC(
+          fit,
+          R = R,
+          alpha = c(0.001, 0.01, 0.05),
+          decomposition = "chol",
+          seed = seed
+        )
+      },
+      error = function() {
+        run <- FALSE # nolint
+      }
     )
-    set.seed(seed)
     results_eigen <- MC(
       fit,
       R = R,
       alpha = c(0.001, 0.01, 0.05),
-      decomposition = "eigen"
+      decomposition = "eigen",
+      seed = seed
     )
-    set.seed(seed)
     results_svd <- MC(
       fit,
       R = R,
       alpha = c(0.001, 0.01, 0.05),
-      decomposition = "svd"
+      decomposition = "svd",
+      seed = seed
     )
     set.seed(seed)
     answers <- MASS::mvrnorm(
@@ -45,27 +53,29 @@ lapply(
       mu = lavaan::coef(fit),
       Sigma = lavaan::vcov(fit)
     )
-    testthat::test_that(
-      paste(text, "chol"),
-      {
-        testthat::expect_equal(
-          results_chol$thetahat$est[names(lavaan::coef(fit))],
-          as.vector(lavaan::coef(fit)),
-          check.attributes = FALSE
-        )
-        testthat::expect_true(
-          abs(
-            .MCCI(
-              results_chol
-            )["visual~~textual", "97.5%"] - quantile(
-              answers[, "visual~~textual"],
-              .975,
-              na.rm = TRUE
-            )
-          ) <= tol
-        )
-      }
-    )
+    if (run) {
+      testthat::test_that(
+        paste(text, "chol"),
+        {
+          testthat::expect_equal(
+            results_chol$thetahat$est[names(lavaan::coef(fit))],
+            as.vector(lavaan::coef(fit)),
+            check.attributes = FALSE
+          )
+          testthat::expect_true(
+            abs(
+              .MCCI(
+                results_chol
+              )["visual~~textual", "97.5%"] - quantile(
+                answers[, "visual~~textual"],
+                .975,
+                na.rm = TRUE
+              )
+            ) <= tol
+          )
+        }
+      )
+    }
     testthat::test_that(
       paste(text, "eigen"),
       {

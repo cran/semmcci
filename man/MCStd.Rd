@@ -4,35 +4,24 @@
 \alias{MCStd}
 \title{Standardized Monte Carlo Confidence Intervals}
 \usage{
-MCStd(object, alpha = c(0.001, 0.01, 0.05))
+MCStd(mc, alpha = c(0.001, 0.01, 0.05))
 }
 \arguments{
-\item{object}{object of class \code{semmcci}.
-Output of the \code{MC()} function.}
+\item{mc}{Output of the \code{\link[=MC]{MC()}} or \code{\link[=MCMI]{MCMI()}} function.}
 
 \item{alpha}{Numeric vector.
-Significance level \eqn{\alpha}.
-Default value is \code{alpha = c(0.001, 0.01, 0.05)}.}
+Significance level \eqn{\alpha}.}
 }
 \value{
-Returns an object of class \code{semmccistd}
-which is a list with the following elements:
+Returns an object of class \code{semmcci} which is
+a list with the following elements:
 \describe{
-\item{\code{R}}{Number of Monte Carlo replications.}
-\item{\code{alpha}}{Significance level \eqn{\alpha} specified.}
-\item{\code{lavaan}}{\code{lavaan} object.}
-\item{\code{decomposition}}{Matrix decomposition
-used to generate multivariate normal
-random variates.}
-\item{\code{thetahat}}{Parameter estimates \eqn{\hat{\theta}}.}
-\item{\code{thetahatstar}}{Sampling distribution of parameter estimates
+\item{call}{Function call.}
+\item{args}{List of function arguments.}
+\item{thetahat}{Parameter estimates \eqn{\hat{\theta}}.}
+\item{thetahatstar}{Sampling distribution of parameter estimates
 \eqn{\hat{\theta}^{\ast}}.}
-\item{\code{ci}}{Confidence intervals.}
-\item{\code{thetahat_std}}{Standardized parameter estimates
-\eqn{\hat{\theta}_{\mathrm{std}}}.}
-\item{\code{thetahatstar_std}}{Standardized sampling distribution
-of parameter estimates
-\eqn{\hat{\theta}^{\ast}_{\mathrm{std}}}.}
+\item{fun}{Function used ("MCStd").}
 }
 }
 \description{
@@ -41,7 +30,7 @@ for free and defined parameters.
 }
 \details{
 The empirical sampling distribution
-of parameter estimates from the argument \code{object} is standardized,
+of parameter estimates from the argument \code{mc} is standardized,
 that is, each randomly generated vector of parameters is standardized.
 Defined parameters are computed from the standardized component parameters.
 Confidence intervals are generated
@@ -51,41 +40,70 @@ using the standardized empirical sampling distribution.
 library(semmcci)
 library(lavaan)
 
-# Generate Data ------------------------------------------------------------
-n <- 1000
-a <- 0.50
-b <- 0.50
-cp <- 0.25
-s2_em <- 1 - a^2
-s2_ey <- 1 - cp^2 - a^2 * b^2 - b^2 * s2_em - 2 * cp * a * b
-em <- rnorm(n = n, mean = 0, sd = sqrt(s2_em))
-ey <- rnorm(n = n, mean = 0, sd = sqrt(s2_ey))
-X <- rnorm(n = n)
-M <- a * X + em
-Y <- cp * X + b * M + ey
-df <- data.frame(X, M, Y)
+# Data ---------------------------------------------------------------------
+data("Tal.Or", package = "psych")
+df <- mice::ampute(Tal.Or)$amp
 
-# Fit Model in lavaan ------------------------------------------------------
+# Monte Carlo --------------------------------------------------------------
+## Fit Model in lavaan -----------------------------------------------------
 model <- "
-  Y ~ cp * X + b * M
-  M ~ a * X
+  reaction ~ cp * cond + b * pmi
+  pmi ~ a * cond
+  cond ~~ cond
   indirect := a * b
   direct := cp
   total := cp + (a * b)
 "
-fit <- sem(data = df, model = model, fixed.x = FALSE)
+fit <- sem(data = df, model = model, missing = "fiml")
 
-# Monte Carlo --------------------------------------------------------------
-output <- MC(
+## MC() --------------------------------------------------------------------
+unstd <- MC(
   fit,
-  R = 100L, # use a large value e.g., 20000L for actual research
-  alpha = c(0.001, 0.01, 0.05)
+  R = 20L, # use a large value e.g., 20000L for actual research
+  alpha = 0.05
 )
 
-# Standardized Monte Carlo -------------------------------------------------
-MCStd(output)
+## Standardized Monte Carlo ------------------------------------------------
+MCStd(unstd, alpha = 0.05)
+
+# Monte Carlo (Multiple Imputation) ----------------------------------------
+## Multiple Imputation -----------------------------------------------------
+mi <- mice::mice(
+  data = df,
+  print = FALSE,
+  m = 5L, # use a large value e.g., 100L for actual research,
+  seed = 42
+)
+
+## Fit Model in lavaan -----------------------------------------------------
+fit <- sem(data = df, model = model) # use default listwise deletion
+
+## MCMI() ------------------------------------------------------------------
+unstd <- MCMI(
+  fit,
+  mi = mi,
+  R = 20L, # use a large value e.g., 20000L for actual research
+  alpha = 0.05
+)
+
+## Standardized Monte Carlo ------------------------------------------------
+MCStd(unstd, alpha = 0.05)
+
+}
+\references{
+Pesigan, I. J. A., & Cheung, S. F. (2023).
+Monte Carlo confidence intervals for the indirect effect with missing data.
+\emph{Behavior Research Methods}.
+\doi{10.3758/s13428-023-02114-4}
+}
+\seealso{
+Other Monte Carlo in Structural Equation Modeling Functions: 
+\code{\link{MCMI}()},
+\code{\link{MC}()}
 }
 \author{
 Ivan Jacob Agaloos Pesigan
 }
+\concept{Monte Carlo in Structural Equation Modeling Functions}
 \keyword{mc}
+\keyword{semmcci}

@@ -3,18 +3,26 @@
 #' @author Ivan Jacob Agaloos Pesigan
 #'
 #' @param object object of class `lavaan`.
+#' @param est Numeric vector.
+#'   If not `NULL`, the parameter estimates are updated.
+#'   using the supplied vector.
+#'   This is used to update the values in the parameter vector
+#'   using new estimates.
 #' @return Returns a list with the following elements
 #' \describe{
-#'   \item{`est`}{Parameter estimates.}
-#'   \item{`par_names`}{Parameter names.}
-#'   \item{`def`}{Defined parameters.}
-#'   \item{`ceq`}{Equality constraints.}
-#'   \item{`cin`}{Inequality constraints.}
-#'   \item{`fixed`}{Fixed parameters.}
+#'   \item{est}{Parameter estimates.}
+#'   \item{par_names}{Parameter names.}
+#'   \item{def}{Defined parameters.}
+#'   \item{ceq}{Equality constraints.}
+#'   \item{cin}{Inequality constraints.}
+#'   \item{fixed}{Fixed parameters.}
 #' }
-#' @keywords parameters internal
+#'
+#' @family Lavaan Helper Functions
+#' @keywords lavHelper parameters internal
 #' @noRd
-.ThetaHat <- function(object) {
+.ThetaHat <- function(object,
+                      est = NULL) {
   # extract all estimates including fixed parameters
   thetahat_names_free <- names(
     lavaan::coef(object)
@@ -38,7 +46,27 @@
       ]
     }
   }
-  thetahat_est <- object@ParTable$est
+  if (is.null(est)) {
+    # extract estimates from parameter table
+    thetahat_est <- object@ParTable$est
+  } else {
+    # update with supplied values
+    thetahat_est <- est
+  }
+  return(
+    .ThetaHatDef(
+      object = object,
+      thetahat_est = thetahat_est,
+      thetahat_names_free = thetahat_names_free,
+      thetahat_names = thetahat_names
+    )
+  )
+}
+
+.ThetaHatDef <- function(object,
+                         thetahat_est,
+                         thetahat_names_free,
+                         thetahat_names) {
   thetahat_fixed <- thetahat_def <- thetahat_cin <- thetahat_ceq <- rep(
     x = NA,
     times = length(thetahat_est)
@@ -90,26 +118,23 @@
   names(
     thetahat_est
   ) <- thetahat_names
-  def <- thetahat_def[
-    stats::complete.cases(thetahat_def)
-  ]
-  ceq <- thetahat_ceq[
-    stats::complete.cases(thetahat_ceq)
-  ]
-  cin <- thetahat_cin[
-    stats::complete.cases(thetahat_cin)
-  ]
-  fixed <- thetahat_fixed[
-    stats::complete.cases(thetahat_fixed)
-  ]
   return(
     list(
       est = thetahat_est,
       par_names = thetahat_names,
-      def = def,
-      ceq = ceq,
-      cin = cin,
-      fixed = fixed
+      def = thetahat_def[
+        stats::complete.cases(thetahat_def)
+      ],
+      ceq = thetahat_ceq[
+        stats::complete.cases(thetahat_ceq)
+      ],
+      cin = thetahat_cin[
+        stats::complete.cases(thetahat_cin)
+      ],
+      fixed = thetahat_fixed[
+        stats::complete.cases(thetahat_fixed)
+      ],
+      free = thetahat_names_free
     )
   )
 }

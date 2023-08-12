@@ -25,14 +25,16 @@
 #'                          used to generate multivariate normal
 #'                          random variates.}
 #' }
-#' @keywords matrix standardized internal
+#'
+#' @family Monte Carlo in Structural Equation Modeling Functions
+#' @keywords semmcci parameters standardized internal
 #' @noRd
-.ThetaStar <- function(R = 20000L,
-                       scale,
-                       location,
-                       decomposition = "eigen",
-                       pd = TRUE,
-                       tol = 1e-06) {
+.ThetaHatStar <- function(R = 20000L,
+                          scale,
+                          location,
+                          decomposition = "eigen",
+                          pd = TRUE,
+                          tol = 1e-06) {
   if (pd) {
     mat <- eigen(
       x = scale,
@@ -58,9 +60,7 @@
   if (decomposition == "chol") {
     dist <- .RandomGaussianChol(
       Z = z,
-      chol = chol(
-        x = scale
-      )
+      chol = chol(x = scale)
     )
   }
   if (decomposition == "eigen") {

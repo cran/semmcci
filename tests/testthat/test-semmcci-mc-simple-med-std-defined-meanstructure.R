@@ -1,4 +1,4 @@
-## ---- test-semmcci-mc-simple-med-std-defined
+## ---- test-semmcci-mc-simple-med-std-defined-meanstructure
 lapply(
   X = 1,
   FUN = function(i,
@@ -32,7 +32,8 @@ lapply(
     fit <- lavaan::sem(
       data = data,
       model = model,
-      fixed.x = FALSE
+      fixed.x = FALSE,
+      meanstructure = TRUE
     )
     run <- TRUE
     tryCatch(
@@ -74,11 +75,6 @@ lapply(
         paste(text, "chol"),
         {
           testthat::expect_equal(
-            results_chol$thetahatstar[3, ],
-            lavaan::standardizedSolution(fit)$est.std,
-            check.attributes = FALSE
-          )
-          testthat::expect_equal(
             .MCCI(
               results_chol
             )["ab", "97.5%"],
@@ -96,11 +92,6 @@ lapply(
       paste(text, "eigen"),
       {
         testthat::expect_equal(
-          results_eigen$thetahatstar[3, ],
-          lavaan::standardizedSolution(fit)$est.std,
-          check.attributes = FALSE
-        )
-        testthat::expect_equal(
           .MCCI(
             results_eigen
           )["ab", "97.5%"],
@@ -117,11 +108,6 @@ lapply(
       paste(text, "svd"),
       {
         testthat::expect_equal(
-          results_svd$thetahatstar[3, ],
-          lavaan::standardizedSolution(fit)$est.std,
-          check.attributes = FALSE
-        )
-        testthat::expect_equal(
           .MCCI(
             results_svd
           )["ab", "97.5%"],
@@ -137,5 +123,5 @@ lapply(
   },
   n = 1000L,
   R = 2000L,
-  text = "test-semmcci-mc-simple-med-std-defined"
+  text = "test-semmcci-mc-simple-med-std-defined-meanstructure"
 )

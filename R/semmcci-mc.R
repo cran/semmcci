@@ -13,12 +13,11 @@
 #'
 #' @author Ivan Jacob Agaloos Pesigan
 #'
-#' @param object object of class `lavaan`.
+#' @param lav Object of class `lavaan`.
 #' @param R Positive integer.
 #'   Number of Monte Carlo replications.
 #' @param alpha Numeric vector.
 #'   Significance level \eqn{\alpha}.
-#'   Default value is `alpha = c(0.001, 0.01, 0.05)`.
 #' @param decomposition Character string.
 #'   Matrix decomposition of the sampling variance-covariance matrix
 #'   for the data generation.
@@ -31,229 +30,125 @@
 #'   is positive definite using `tol`.
 #' @param tol Numeric.
 #'   Tolerance used for `pd`.
-#' @return Returns an object of class `semmcci`
-#' which is a list with the following elements:
-#' \describe{
-#'   \item{`R`}{Number of Monte Carlo replications.}
-#'   \item{`alpha`}{Significance level \eqn{\alpha} specified.}
-#'   \item{`lavaan`}{`lavaan` object.}
-#'   \item{`decomposition`}{Matrix decomposition
-#'                          used to generate multivariate
-#'                          normal random variates.}
-#'   \item{`thetahat`}{Parameter estimates \eqn{\hat{\theta}}.}
-#'   \item{`thetahatstar`}{Sampling distribution of parameter estimates
+#' @param seed Integer.
+#'   Random seed for reproducibility.
+#'
+#' @return Returns an object of class `semmcci` which is
+#'   a list with the following elements:
+#'   \describe{
+#'     \item{call}{Function call.}
+#'     \item{args}{List of function arguments.}
+#'     \item{thetahat}{Parameter estimates \eqn{\hat{\theta}}.}
+#'     \item{thetahatstar}{Sampling distribution of parameter estimates
 #'                         \eqn{\hat{\theta}^{\ast}}.}
-#' }
+#'     \item{fun}{Function used ("MC").}
+#'   }
+#'
 #' @examples
 #' library(semmcci)
 #' library(lavaan)
 #'
-#' # Generate Data ------------------------------------------------------------
-#' n <- 1000
-#' a <- 0.50
-#' b <- 0.50
-#' cp <- 0.25
-#' s2_em <- 1 - a^2
-#' s2_ey <- 1 - cp^2 - a^2 * b^2 - b^2 * s2_em - 2 * cp * a * b
-#' em <- rnorm(n = n, mean = 0, sd = sqrt(s2_em))
-#' ey <- rnorm(n = n, mean = 0, sd = sqrt(s2_ey))
-#' X <- rnorm(n = n)
-#' M <- a * X + em
-#' Y <- cp * X + b * M + ey
-#' df <- data.frame(X, M, Y)
+#' # Data ---------------------------------------------------------------------
+#' data("Tal.Or", package = "psych")
+#' df <- mice::ampute(Tal.Or)$amp
 #'
-#' # Fit Model in lavaan ------------------------------------------------------
+#' # Monte Carlo --------------------------------------------------------------
+#' ## Fit Model in lavaan -----------------------------------------------------
 #' model <- "
-#'   Y ~ cp * X + b * M
-#'   M ~ a * X
+#'   reaction ~ cp * cond + b * pmi
+#'   pmi ~ a * cond
+#'   cond ~~ cond
 #'   indirect := a * b
 #'   direct := cp
 #'   total := cp + (a * b)
 #' "
-#' fit <- sem(data = df, model = model)
+#' fit <- sem(data = df, model = model, missing = "fiml")
 #'
-#' # Monte Carlo --------------------------------------------------------------
+#' ## MC() --------------------------------------------------------------------
 #' MC(
 #'   fit,
-#'   R = 100L, # use a large value e.g., 20000L for actual research
-#'   alpha = c(0.001, 0.01, 0.05)
+#'   R = 20L, # use a large value e.g., 20000L for actual research
+#'   alpha = 0.05
 #' )
-#' @keywords mc
+#'
+#' @references
+#' MacKinnon, D. P., Lockwood, C. M., & Williams, J. (2004).
+#' Confidence limits for the indirect effect:
+#' Distribution of the product and resampling methods.
+#' *Multivariate Behavioral Research*, *39*(1), 99-128.
+#' \doi{10.1207/s15327906mbr3901_4}
+#'
+#' Pesigan, I. J. A., & Cheung, S. F. (2023).
+#' Monte Carlo confidence intervals for the indirect effect with missing data.
+#' *Behavior Research Methods*.
+#' \doi{10.3758/s13428-023-02114-4}
+#'
+#' Preacher, K. J., & Selig, J. P. (2012).
+#' Advantages of Monte Carlo confidence intervals for indirect effects.
+#' *Communication Methods and Measures*, *6*(2), 77–98.
+#' \doi{10.1080/19312458.2012.679848}
+#'
+#' @family Monte Carlo in Structural Equation Modeling Functions
+#' @keywords semmcci mc
 #' @export
-MC <- function(object,
+MC <- function(lav,
                R = 20000L,
                alpha = c(0.001, 0.01, 0.05),
                decomposition = "eigen",
                pd = TRUE,
-               tol = 1e-06) {
+               tol = 1e-06,
+               seed = NULL) {
   stopifnot(
-    methods::is(
-      object,
+    inherits(
+      lav,
       "lavaan"
     )
   )
+  args <- list(
+    lav = lav,
+    R = R,
+    alpha = alpha,
+    decomposition = decomposition,
+    pd = pd,
+    tol = tol,
+    seed = seed
+  )
+  # mc
   if (!is.null(decomposition)) {
     if (decomposition == "chol") {
       pd <- FALSE
     }
   }
-  # set up Monte Carlo
-  thetahatstar <- .ThetaStar(
+  ## set up Monte Carlo
+  set.seed(seed)
+  thetahatstar <- .ThetaHatStar(
     R = R,
-    scale = lavaan::vcov(object),
-    location = lavaan::coef(object),
+    scale = lavaan::vcov(lav),
+    location = lavaan::coef(lav),
     decomposition = decomposition,
     pd = pd,
     tol = tol
   )
   thetahatstar_orig <- thetahatstar$thetahatstar
   decomposition <- thetahatstar$decomposition
-  # extract all estimates including fixed parameters
+  ## extract all estimates including fixed parameters
   thetahat <- .ThetaHat(
-    object = object
+    object = lav,
+    est = NULL # should always be null
   )
-  # generate defined parameters
-  if (length(thetahat$def) > 0) {
-    def <- function(i) {
-      tryCatch(
-        {
-          return(
-            object@Model@def.function(
-              thetahatstar_orig[
-                i,
-              ]
-            )
-          )
-        },
-        warning = function(w) {
-          return(NA)
-        },
-        error = function(e) {
-          return(NA)
-        }
-      )
-    }
-    thetahatstar_def <- lapply(
-      X = seq_len(
-        dim(
-          thetahatstar_orig
-        )[1]
-      ),
-      FUN = def
-    )
-    thetahatstar_def <- do.call(
-      what = "rbind",
-      args = thetahatstar_def
-    )
-    thetahatstar <- cbind(
-      thetahatstar_orig,
-      thetahatstar_def
-    )
-  } else {
-    thetahatstar <- thetahatstar_orig
-  }
-  # generate equality
-  if (length(thetahat$ceq) > 0) {
-    ceq <- function(i) {
-      out <- object@Model@ceq.function(
-        thetahatstar[
-          i,
-        ]
-      )
-      names(out) <- paste0(
-        thetahat$ceq,
-        "_ceq"
-      )
-      return(out)
-    }
-    thetahatstar_ceq <- lapply(
-      X = seq_len(
-        dim(
-          thetahatstar
-        )[1]
-      ),
-      FUN = ceq
-    )
-    thetahatstar_ceq <- do.call(
-      what = "rbind",
-      args = thetahatstar_ceq
-    )
-    thetahatstar <- cbind(
-      thetahatstar,
-      thetahatstar_ceq
-    )
-  }
-  # generate inequality
-  if (length(thetahat$cin) > 0) {
-    cin <- function(i) {
-      out <- object@Model@cin.function(
-        thetahatstar[
-          i,
-        ]
-      )
-      names(out) <- paste0(
-        thetahat$cin,
-        "_cin"
-      )
-      return(out)
-    }
-    thetahatstar_cin <- lapply(
-      X = seq_len(
-        dim(
-          thetahatstar
-        )[1]
-      ),
-      FUN = cin
-    )
-    thetahatstar_cin <- do.call(
-      what = "rbind",
-      args = thetahatstar_cin
-    )
-    thetahatstar <- cbind(
-      thetahatstar,
-      thetahatstar_cin
-    )
-  }
-  # generate fixed
-  if (length(thetahat$fixed) > 0) {
-    fixed <- matrix(
-      NA,
-      ncol = length(
-        thetahat$fixed
-      ),
-      nrow = dim(
-        thetahatstar
-      )[1]
-    )
-    colnames(
-      fixed
-    ) <- thetahat$fixed
-    for (i in seq_len(dim(fixed)[2])) {
-      fixed[
-        ,
-        i
-      ] <- thetahat$est[
-        thetahat$fixed[[i]]
-      ]
-    }
-    thetahatstar <- cbind(
-      thetahatstar,
-      fixed
-    )
-  }
-  # rearrange
-  thetahatstar <- thetahatstar[
-    ,
-    thetahat$par_names
-  ]
+  # defined parameters
+  thetahatstar <- .MCDef(
+    object = lav,
+    thetahat = thetahat,
+    thetahatstar_orig = thetahatstar_orig
+  )
   # output
   out <- list(
-    R = R,
-    alpha = alpha,
-    lavaan = object,
-    decomposition = decomposition,
+    call = match.call(),
+    args = args,
     thetahat = thetahat,
-    thetahatstar = thetahatstar
+    thetahatstar = thetahatstar,
+    fun = "MC"
   )
   class(out) <- c(
     "semmcci",

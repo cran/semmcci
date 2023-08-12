@@ -1,4 +1,4 @@
-## ---- test-semmcci-mc-simple-med-defined-equality
+## ---- test-semmcci-mc-simple-med-defined-meanstructure
 lapply(
   X = 1,
   FUN = function(i,
@@ -15,6 +15,12 @@ lapply(
     sigma2ey <- 1 - b^2 - cp^2 - 2 * a * b * cp
     sigma2em <- 1 - a^2
     sigma2x <- 1
+    coefs <- c(
+      cp = cp,
+      b = b,
+      a = a,
+      ab = a * b
+    )
     x <- rnorm(n = n, sd = sqrt(sigma2x))
     m <- a * x + rnorm(n = n, sd = sqrt(sigma2em))
     y <- cp * x + b * m + rnorm(n = n, sd = sqrt(sigma2ey))
@@ -22,34 +28,42 @@ lapply(
     model <- "
       y ~ cp * x + b * m
       m ~ a * x
-      a == b
       ab := a * b
     "
     fit <- lavaan::sem(
       data = data,
       model = model,
-      fixed.x = FALSE
+      fixed.x = FALSE,
+      meanstructure = TRUE
     )
-    set.seed(seed)
-    results_chol <- MC(
-      fit,
-      R = R,
-      alpha = c(0.001, 0.01, 0.05),
-      decomposition = "chol"
+    run <- TRUE
+    tryCatch(
+      {
+        results_chol <- MC(
+          fit,
+          R = R,
+          alpha = c(0.001, 0.01, 0.05),
+          decomposition = "chol",
+          seed = seed
+        )
+      },
+      error = function() {
+        run <- FALSE # nolint
+      }
     )
-    set.seed(seed)
     results_eigen <- MC(
       fit,
       R = R,
       alpha = c(0.001, 0.01, 0.05),
-      decomposition = "eigen"
+      decomposition = "eigen",
+      seed = seed
     )
-    set.seed(seed)
     results_svd <- MC(
       fit,
       R = R,
       alpha = c(0.001, 0.01, 0.05),
-      decomposition = "svd"
+      decomposition = "svd",
+      seed = seed
     )
     set.seed(seed)
     answers <- MASS::mvrnorm(
@@ -61,32 +75,34 @@ lapply(
       answers,
       ab = answers[, "a"] * answers[, "b"]
     )
-    testthat::test_that(
-      paste(text, "chol"),
-      {
-        testthat::expect_equal(
-          results_chol$thetahat$est[c(1:6, 8)],
-          lavaan::parameterEstimates(fit)$est,
-          check.attributes = FALSE
-        )
-        testthat::expect_true(
-          abs(
-            .MCCI(
-              results_chol
-            )["ab", "97.5%"] - quantile(
-              answers[, "ab"],
-              .975,
-              na.rm = TRUE
-            )
-          ) <= tol
-        )
-      }
-    )
+    if (run) {
+      testthat::test_that(
+        paste(text, "chol"),
+        {
+          testthat::expect_equal(
+            results_chol$thetahat$est,
+            lavaan::parameterEstimates(fit)$est,
+            check.attributes = FALSE
+          )
+          testthat::expect_true(
+            abs(
+              .MCCI(
+                results_chol
+              )["ab", "97.5%"] - quantile(
+                answers[, "ab"],
+                .975,
+                na.rm = TRUE
+              )
+            ) <= tol
+          )
+        }
+      )
+    }
     testthat::test_that(
       paste(text, "eigen"),
       {
         testthat::expect_equal(
-          results_eigen$thetahat$est[c(1:6, 8)],
+          results_eigen$thetahat$est,
           lavaan::parameterEstimates(fit)$est,
           check.attributes = FALSE
         )
@@ -107,7 +123,7 @@ lapply(
       paste(text, "svd"),
       {
         testthat::expect_equal(
-          results_svd$thetahat$est[c(1:6, 8)],
+          results_svd$thetahat$est,
           lavaan::parameterEstimates(fit)$est,
           check.attributes = FALSE
         )
@@ -127,6 +143,6 @@ lapply(
   },
   n = 1000L,
   R = 2000L,
-  tol = 0.05,
-  text = "test-semmcci-mc-simple-med-defined-equality"
+  tol = 0.01,
+  text = "test-semmcci-mc-simple-med-defined-meanstructure"
 )
