@@ -78,7 +78,7 @@
 #' *Multivariate Behavioral Research*, *39*(1), 99-128.
 #' \doi{10.1207/s15327906mbr3901_4}
 #'
-#' Pesigan, I. J. A., & Cheung, S. F. (2023).
+#' Pesigan, I. J. A., & Cheung, S. F. (2024).
 #' Monte Carlo confidence intervals for the indirect effect with missing data.
 #' *Behavior Research Methods*.
 #' \doi{10.3758/s13428-023-02114-4}
@@ -100,8 +100,8 @@ MC <- function(lav,
                seed = NULL) {
   stopifnot(
     inherits(
-      lav,
-      "lavaan"
+      x = lav,
+      what = "lavaan"
     )
   )
   args <- list(
@@ -156,5 +156,5 @@ MC <- function(lav,
     "semmcci",
     class(out)
   )
-  return(out)
+  out
 }

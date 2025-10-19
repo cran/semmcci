@@ -1,4 +1,12 @@
+# semmcci 1.1.5
+
+## Patch
+
+* Minor edits to methods.
+
 # semmcci 1.1.4
+
+## Patch
 
 * Added the `Func()` and `MCFunc()` functions.
 

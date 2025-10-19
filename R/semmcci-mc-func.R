@@ -41,7 +41,7 @@
 #' func <- function(x) {
 #'   out <- exp(x)
 #'   names(out) <- "exp"
-#'   return(out)
+#'   out
 #' }
 #' ### Generate Confidence Intervals ------------------------------------------
 #' MCFunc(
@@ -59,7 +59,7 @@
 #' *Multivariate Behavioral Research*, *39*(1), 99-128.
 #' \doi{10.1207/s15327906mbr3901_4}
 #'
-#' Pesigan, I. J. A., & Cheung, S. F. (2023).
+#' Pesigan, I. J. A., & Cheung, S. F. (2024).
 #' Monte Carlo confidence intervals for the indirect effect with missing data.
 #' *Behavior Research Methods*.
 #' \doi{10.3758/s13428-023-02114-4}
@@ -115,22 +115,47 @@ MCFunc <- function(coef,
   )
   par <- FALSE
   if (!is.null(ncores)) {
+    # nolint start
     ncores <- as.integer(ncores)
     if (ncores > 1) {
       par <- TRUE
     }
+    # nolint end
   }
   if (par) {
-    cl <- parallel::makeCluster(ncores)
-    on.exit(
-      parallel::stopCluster(cl = cl)
-    )
-    thetahatstar <- parallel::parLapply(
-      cl = cl,
-      X = thetahatstar,
-      fun = func,
-      ...
-    )
+    # nolint start
+    available_cores <- parallel::detectCores()
+    if (ncores >= available_cores) {
+      ncores <- available_cores
+    }
+    os_type <- Sys.info()["sysname"]
+    if (os_type == "Darwin") {
+      fork <- TRUE
+    } else if (os_type == "Linux") {
+      fork <- TRUE
+    } else {
+      fork <- FALSE
+    }
+    if (fork) {
+      thetahatstar <- parallel::mclapply(
+        X = thetahatstar,
+        FUN = func,
+        mc.cores = ncores,
+        ...
+      )
+    } else {
+      cl <- parallel::makeCluster(ncores)
+      on.exit(
+        parallel::stopCluster(cl = cl)
+      )
+      thetahatstar <- parallel::parLapply(
+        cl = cl,
+        X = thetahatstar,
+        fun = func,
+        ...
+      )
+    }
+    # nolint end
   } else {
     thetahatstar <- lapply(
       X = thetahatstar,
@@ -156,5 +181,5 @@ MCFunc <- function(coef,
     "semmcci",
     class(out)
   )
-  return(out)
+  out
 }

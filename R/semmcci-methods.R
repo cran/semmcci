@@ -8,7 +8,7 @@
 #'   use the argument `alpha` used in `x`.
 #' @param digits Integer indicating the number of decimal places to display.
 #' @param ... further arguments.
-#' @return Returns a matrix of estimates, standard errors,
+#' @return Prints a matrix of estimates, standard errors,
 #'   number of Monte Carlo replications, and confidence intervals.
 #'
 #' @examples
@@ -72,21 +72,10 @@ print.semmcci <- function(x,
                           alpha = NULL,
                           digits = 4,
                           ...) {
-  if (x$fun == "MC") {
-    cat("Monte Carlo Confidence Intervals\n")
-  }
-  if (x$fun == "MCMI") {
-    cat("Monte Carlo Confidence Intervals (Multiple Imputation Estimates)\n")
-  }
-  if (x$fun == "MCStd") {
-    cat("Standardized Monte Carlo Confidence Intervals\n")
-  }
-  base::print(
-    round(
-      .MCCI(
-        object = x,
-        alpha = alpha
-      ),
+  print.summary.semmcci(
+    summary.semmcci(
+      object = x,
+      alpha = alpha,
       digits = digits
     )
   )
@@ -167,6 +156,47 @@ summary.semmcci <- function(object,
                             alpha = NULL,
                             digits = 4,
                             ...) {
+  ci <- .MCCI(
+    object = object,
+    alpha = alpha
+  )
+  print_summary <- round(
+    x = ci,
+    digits = digits
+  )
+  attr(
+    x = ci,
+    which = "fit"
+  ) <- object
+  attr(
+    x = ci,
+    which = "print_summary"
+  ) <- print_summary
+  attr(
+    x = ci,
+    which = "alpha"
+  ) <- alpha
+  attr(
+    x = ci,
+    which = "digits"
+  ) <- digits
+  class(ci) <- "summary.semmcci"
+  ci
+}
+
+#' @noRd
+#' @keywords internal
+#' @exportS3Method print summary.semmcci
+print.summary.semmcci <- function(x,
+                                  ...) {
+  print_summary <- attr(
+    x = x,
+    which = "print_summary"
+  )
+  object <- attr(
+    x = x,
+    which = "fit"
+  )
   if (object$fun == "MC") {
     cat("Monte Carlo Confidence Intervals\n")
   }
@@ -176,15 +206,8 @@ summary.semmcci <- function(object,
   if (object$fun == "MCStd") {
     cat("Standardized Monte Carlo Confidence Intervals\n")
   }
-  return(
-    round(
-      .MCCI(
-        object = object,
-        alpha = alpha
-      ),
-      digits = digits
-    )
-  )
+  print(print_summary)
+  invisible(x)
 }
 
 #' Parameter Estimates
@@ -254,7 +277,7 @@ summary.semmcci <- function(object,
 #' @export
 coef.semmcci <- function(object,
                          ...) {
-  return(object$thetahat$est)
+  object$thetahat$est
 }
 
 #' Sampling Covariance Matrix of the Parameter Estimates
@@ -426,7 +449,5 @@ confint.semmcci <- function(object,
     x = varnames
   )
   colnames(ci) <- varnames
-  return(
-    ci
-  )
+  ci
 }
