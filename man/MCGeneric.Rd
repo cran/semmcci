@@ -119,16 +119,16 @@ Monte Carlo confidence intervals for the indirect effect with missing data.
 
 Preacher, K. J., & Selig, J. P. (2012).
 Advantages of Monte Carlo confidence intervals for indirect effects.
-\emph{Communication Methods and Measures}, \emph{6}(2), 77–98.
+\emph{Communication Methods and Measures}, \emph{6}(2), 77--98.
 \doi{10.1080/19312458.2012.679848}
 }
 \seealso{
-Other Monte Carlo in Structural Equation Modeling Functions: 
-\code{\link{Func}()},
-\code{\link{MC}()},
-\code{\link{MCFunc}()},
-\code{\link{MCMI}()},
-\code{\link{MCStd}()}
+Other Monte Carlo in Structural Equation Modeling Functions:
+\code{\link[=Func]{Func()}},
+\code{\link[=MC]{MC()}},
+\code{\link[=MCFunc]{MCFunc()}},
+\code{\link[=MCMI]{MCMI()}},
+\code{\link[=MCStd]{MCStd()}}
 }
 \author{
 Ivan Jacob Agaloos Pesigan
